@@ -22,11 +22,21 @@ class ZoneCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 폰트(한글 fallback 등)에 따라 intrinsic/실제 높이가 달라져
+          // IntrinsicHeight 안에서 1px overflow가 나지 않도록 줄 높이를 고정.
           Text(
             zone.label.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            strutStyle: const StrutStyle(
+              fontSize: 34,
+              height: 1.2,
+              forceStrutHeight: true,
+            ),
             style: TextStyle(
               color: zone.color,
               fontSize: 34,
+              height: 1.2,
               fontWeight: FontWeight.w800,
               letterSpacing: 1,
             ),
@@ -34,7 +44,18 @@ class ZoneCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             zone == AgvZone.unknown ? '위치 확인 불가' : '구역 내 주행 중',
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            strutStyle: const StrutStyle(
+              fontSize: 13,
+              height: 1.4,
+              forceStrutHeight: true,
+            ),
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              height: 1.4,
+            ),
           ),
           const SizedBox(height: 16),
           Row(
@@ -61,7 +82,7 @@ class _ZoneCell extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      height: 44,
+      constraints: const BoxConstraints(minHeight: 44),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: active

@@ -24,7 +24,6 @@ class MonitorScreen extends StatelessWidget {
       listenable: controller,
       builder: (context, _) {
         final status = controller.status;
-        final next = controller.nextSimulatedState;
 
         return Scaffold(
           appBar: AppBar(
@@ -35,26 +34,7 @@ class MonitorScreen extends StatelessWidget {
                 sourceName: controller.sourceName,
                 connection: controller.connection,
               ),
-              if (controller.canSimulate)
-                PopupMenuButton<DriveState>(
-                  tooltip: '상태 직접 선택',
-                  icon: const Icon(Icons.tune_rounded),
-                  onSelected: controller.setScenario,
-                  itemBuilder: (context) => [
-                    for (final s in DriveState.values)
-                      PopupMenuItem(
-                        value: s,
-                        child: Row(
-                          children: [
-                            Icon(s.icon, color: s.color, size: 18),
-                            const SizedBox(width: 10),
-                            Text(s.label),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
             ],
           ),
           body: SafeArea(
@@ -80,7 +60,7 @@ class MonitorScreen extends StatelessWidget {
                       );
 
                 return SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 1100),
@@ -107,15 +87,13 @@ class MonitorScreen extends StatelessWidget {
               },
             ),
           ),
-          floatingActionButtonLocation:
-              FloatingActionButtonLocation.centerFloat,
-          floatingActionButton: next == null
-              ? null
-              : FloatingActionButton.extended(
-                  onPressed: controller.cycleScenario,
-                  icon: const Icon(Icons.sync_rounded),
-                  label: Text('상태 전환  →  ${next.label}'),
-                ),
+          bottomNavigationBar: controller.canSimulate
+              ? _ScenarioBar(
+                  key: const ValueKey('scenario-bar'),
+                  current: status.driveState,
+                  onSelected: controller.setScenario,
+                )
+              : null,
         );
       },
     );
@@ -155,8 +133,11 @@ class _Title extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.accent.withValues(alpha: 0.5)),
           ),
-          child: const Icon(Icons.shield_moon_rounded,
-              color: AppColors.accent, size: 20),
+          child: const Icon(
+            Icons.shield_moon_rounded,
+            color: AppColors.accent,
+            size: 20,
+          ),
         ),
         const SizedBox(width: 10),
         const Flexible(
@@ -222,6 +203,117 @@ class _ConnectionBadge extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 하단 상태 선택 바 (더미 모드 전용). 현재 상태를 강조 표시.
+class _ScenarioBar extends StatelessWidget {
+  const _ScenarioBar({
+    super.key,
+    required this.current,
+    required this.onSelected,
+  });
+
+  final DriveState current;
+  final ValueChanged<DriveState> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Center(
+          heightFactor: 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1100),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Row(
+                children: [
+                  for (final s in DriveState.values) ...[
+                    Expanded(
+                      child: _ScenarioButton(
+                        state: s,
+                        selected: s == current,
+                        onTap: () => onSelected(s),
+                      ),
+                    ),
+                    if (s != DriveState.values.last) const SizedBox(width: 6),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ScenarioButton extends StatelessWidget {
+  const _ScenarioButton({
+    required this.state,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final DriveState state;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = state.color;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: selected ? null : onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: selected
+                ? color.withValues(alpha: 0.22)
+                : AppColors.surfaceHigh,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: selected ? color : AppColors.border,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                state.icon,
+                size: 20,
+                color: selected ? color : AppColors.textSecondary,
+              ),
+              const SizedBox(height: 4),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  state.label,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: selected
+                        ? AppColors.textPrimary
+                        : AppColors.textSecondary,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
