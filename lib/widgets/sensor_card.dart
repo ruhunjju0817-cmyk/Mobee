@@ -92,61 +92,86 @@ class _SensorRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final color = level.color;
     return Padding(
-      padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
       child: Column(
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: AppColors.textSecondary),
+              Icon(icon, size: 14, color: p.textMuted),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   label,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  strutStyle: AppText.strut(12, 1.4),
+                  style: TextStyle(
+                    color: p.textSecondary,
+                    fontSize: 12,
+                    height: 1.4,
                   ),
                 ),
               ),
               Text(
                 value.toStringAsFixed(fractionDigits),
-                style: TextStyle(
-                  color: color,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+                strutStyle: AppText.strut(20),
+                style: AppText.value(p, color, size: 20),
               ),
-              const SizedBox(width: 3),
-              SizedBox(
-                width: 22,
-                child: Text(
-                  unit,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
+              const SizedBox(width: 4),
+              SizedBox(width: 22, child: Text(unit, style: AppText.unit(p))),
             ],
           ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(end: (value / max).clamp(0.0, 1.0)),
-              duration: const Duration(milliseconds: 400),
-              builder: (context, v, _) => LinearProgressIndicator(
-                value: v,
-                minHeight: 6,
-                color: color,
-                backgroundColor: AppColors.surfaceHigh,
+          const SizedBox(height: 8),
+          _Gauge(fraction: (value / max).clamp(0.0, 1.0), color: color),
+        ],
+      ),
+    );
+  }
+}
+
+/// 얇고 둥근 게이지 바. 채워진 부분은 그라데이션 + 글로우.
+class _Gauge extends StatelessWidget {
+  const _Gauge({required this.fraction, required this.color});
+
+  final double fraction;
+  final Color color;
+
+  static const _height = 4.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return SizedBox(
+      height: _height,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: p.surfaceHigh,
+          borderRadius: BorderRadius.circular(_height),
+        ),
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(end: fraction),
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeOutCubic,
+          builder: (context, v, _) => FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: v,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(_height),
+                gradient: LinearGradient(
+                  colors: [color.withValues(alpha: 0.45), color],
+                ),
+                boxShadow: [
+                  BoxShadow(color: p.glow(color, 0.3), blurRadius: 6),
+                ],
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }

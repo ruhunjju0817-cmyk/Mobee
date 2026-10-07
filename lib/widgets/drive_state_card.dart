@@ -13,6 +13,7 @@ class DriveStateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final color = state.color;
     return SectionCard(
       index: 2,
@@ -26,34 +27,38 @@ class DriveStateCard extends StatelessWidget {
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
-                width: 56,
-                height: 56,
+                width: 60,
+                height: 60,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.18),
+                  color: color.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
-                  border: Border.all(color: color, width: 2),
+                  border: Border.all(color: color.withValues(alpha: 0.8)),
+                  boxShadow: [
+                    BoxShadow(color: p.glow(color, 0.25), blurRadius: 16),
+                  ],
                 ),
                 child: Icon(state.icon, color: color, size: 30),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 18),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       state.label.toUpperCase(),
-                      style: TextStyle(
-                        color: color,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1,
-                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      strutStyle: AppText.strut(32),
+                      style: AppText.value(p, color, size: 32),
                     ),
+                    const SizedBox(height: 6),
                     Text(
                       state.description,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
+                      strutStyle: AppText.strut(13, 1.4),
+                      style: TextStyle(
+                        color: p.textSecondary,
                         fontSize: 13,
+                        height: 1.4,
                       ),
                     ),
                   ],
@@ -61,7 +66,7 @@ class DriveStateCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 22),
           Wrap(
             spacing: 6,
             runSpacing: 6,
@@ -84,21 +89,25 @@ class _StateChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final color = state.color;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: active ? color.withValues(alpha: 0.2) : AppColors.surfaceHigh,
+        color: active ? color.withValues(alpha: 0.15) : Colors.transparent,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: active ? color : AppColors.border),
+        border: Border.all(
+          color: active ? color.withValues(alpha: 0.8) : p.border,
+        ),
       ),
       child: Text(
         state.label,
         style: TextStyle(
-          color: active ? color : AppColors.textSecondary,
+          color: active ? color : p.textMuted,
           fontSize: 11,
           fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+          letterSpacing: 0.4,
         ),
       ),
     );

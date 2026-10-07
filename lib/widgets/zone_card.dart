@@ -5,7 +5,7 @@ import '../theme/app_theme.dart';
 import '../theme/status_style.dart';
 import 'section_card.dart';
 
-/// ① 현재 Zone 표시.
+/// ① 현재 Zone 표시. 구역 번호를 크게 강조.
 class ZoneCard extends StatelessWidget {
   const ZoneCard({super.key, required this.zone});
 
@@ -15,6 +15,8 @@ class ZoneCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
+    final known = zone != AgvZone.unknown;
     return SectionCard(
       index: 1,
       title: '현재 ZONE',
@@ -22,47 +24,52 @@ class ZoneCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 폰트(한글 fallback 등)에 따라 intrinsic/실제 높이가 달라져
-          // IntrinsicHeight 안에서 1px overflow가 나지 않도록 줄 높이를 고정.
-          Text(
-            zone.label.toUpperCase(),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            strutStyle: const StrutStyle(
-              fontSize: 34,
-              height: 1.2,
-              forceStrutHeight: true,
-            ),
-            style: TextStyle(
-              color: zone.color,
-              fontSize: 34,
-              height: 1.2,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                known ? '${zone.code}' : '–',
+                strutStyle: AppText.strut(64, 1.05),
+                style: AppText.value(p, zone.color(p), size: 64),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        known ? 'ZONE' : 'UNKNOWN',
+                        strutStyle: AppText.strut(11, 1.4),
+                        style: AppText.label(p),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        known ? '구역 내 주행 중' : '위치 확인 불가',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        strutStyle: AppText.strut(13, 1.4),
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            zone == AgvZone.unknown ? '위치 확인 불가' : '구역 내 주행 중',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            strutStyle: const StrutStyle(
-              fontSize: 13,
-              height: 1.4,
-              forceStrutHeight: true,
-            ),
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 13,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 22),
           Row(
             children: [
               for (final z in _mapZones) ...[
-                Expanded(child: _ZoneCell(zone: z, active: z == zone)),
-                if (z != _mapZones.last) const SizedBox(width: 8),
+                Expanded(
+                  child: _ZoneCell(zone: z, active: z == zone),
+                ),
+                if (z != _mapZones.last) const SizedBox(width: 10),
               ],
             ],
           ),
@@ -80,33 +87,39 @@ class _ZoneCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
+    final color = p.accent;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      constraints: const BoxConstraints(minHeight: 44),
+      constraints: const BoxConstraints(minHeight: 42),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: active
-            ? AppColors.accent.withValues(alpha: 0.22)
-            : AppColors.surfaceHigh,
-        borderRadius: BorderRadius.circular(10),
+            ? color.withValues(alpha: 0.16)
+            : p.surfaceHigh.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: active ? AppColors.accent : AppColors.border,
+          color: active ? color : p.border,
           width: active ? 1.5 : 1,
         ),
+        boxShadow: active
+            ? [BoxShadow(color: p.glow(color, 0.2), blurRadius: 12)]
+            : null,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           if (active) ...[
-            const Icon(Icons.navigation_rounded,
-                size: 14, color: AppColors.accent),
-            const SizedBox(width: 4),
+            Icon(Icons.navigation_rounded, size: 14, color: color),
+            const SizedBox(width: 6),
           ],
           Text(
             'Z${zone.code}',
             style: TextStyle(
-              color: active ? AppColors.textPrimary : AppColors.textSecondary,
-              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              color: active ? p.textPrimary : p.textMuted,
+              fontSize: 13,
+              fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+              letterSpacing: 1,
             ),
           ),
         ],
