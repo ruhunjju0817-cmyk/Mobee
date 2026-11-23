@@ -276,12 +276,12 @@ void main() {
       expect(find.textContaining('아직 수신된 패킷이 없습니다'), findsOneWidget);
 
       created.single.emit(
-        AgvPacketParser.parse('S=NORMAL;F=150;L=12;R=-1;T=1.5;V=0.1')!,
+        AgvPacketParser.parse('S=NORMAL;F=150;L=12;R=40;T=-1;V=0.1')!,
       );
       await tester.pump();
       expect(find.text('-'), findsNothing);
       expect(find.text('150.0'), findsOneWidget);
-      expect(find.text('미사용'), findsOneWidget); // R=-1
+      expect(find.text('미사용'), findsOneWidget); // T=-1
       expect(find.text('LAST UPDATE   --:--:--'), findsNothing);
       c.dispose();
     });

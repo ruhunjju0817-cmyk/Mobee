@@ -43,7 +43,7 @@ class SensorCard extends StatelessWidget {
           _SensorRow(
             hasData: hasData,
             icon: Icons.east_rounded,
-            label: '우측 ToF',
+            label: '우측 초음파',
             value: sensors.rightDistanceCm,
             unit: 'cm',
             max: 50,

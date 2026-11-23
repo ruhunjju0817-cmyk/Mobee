@@ -8,35 +8,35 @@ AgvStatus _p(String line) => AgvPacketParser.parse(line)!;
 
 /// docs/PACKET.md의 "상태별 예시 패킷"과 동일하게 유지할 것.
 const packetDocExamples = <String, (DriveState, AlertPriority)>{
-  'Z=1;S=NORMAL;H=;F=150;L=40;R=-1;T=1.2;V=0.12': (
+  'Z=1;S=NORMAL;H=;F=150;L=40;R=45;T=1.2;V=0.12': (
     DriveState.normal,
     AlertPriority.normal,
   ),
-  'Z=2;S=WARN;H=SIDE;F=40;L=11;R=-1;T=3.5;V=0.38': (
+  'Z=2;S=WARN;H=SIDE;F=40;L=11;R=35;T=3.5;V=0.38': (
     DriveState.warning,
     AlertPriority.warning,
   ),
-  'Z=3;S=DANGER;H=FRONT;F=15;L=25;R=-1;T=2.0;V=0.60': (
+  'Z=3;S=DANGER;H=FRONT;F=15;L=25;R=30;T=2.0;V=0.60': (
     DriveState.danger,
     AlertPriority.danger,
   ),
-  'Z=2;S=BLOCK;H=FRONT;F=6;L=6;R=-1;T=0.8;V=0.05': (
+  'Z=2;S=BLOCK;H=FRONT;F=6;L=6;R=7;T=0.8;V=0.05': (
     DriveState.blocked,
     AlertPriority.blocked,
   ),
-  'Z=4;S=STOP;H=;F=200;L=60;R=-1;T=0;V=0': (
+  'Z=4;S=STOP;H=;F=200;L=60;R=60;T=0;V=0': (
     DriveState.stopped,
     AlertPriority.none,
   ),
-  'Z=3;S=STOP;H=COLLISION;F=3;L=20;R=-1;T=1.0;V=1.80': (
+  'Z=3;S=STOP;H=COLLISION;F=3;L=20;R=18;T=1.0;V=1.80': (
     DriveState.stopped,
     AlertPriority.collision,
   ),
-  'Z=2;S=STOP;H=TILT;F=120;L=30;R=-1;T=14.0;V=0.40': (
+  'Z=2;S=STOP;H=TILT;F=120;L=30;R=30;T=14.0;V=0.40': (
     DriveState.stopped,
     AlertPriority.tilt,
   ),
-  'Z=0;S=STOP;H=LINE_LOST;F=150;L=-1;R=-1;T=-1;V=-1': (
+  'Z=0;S=STOP;H=LINE_LOST;F=150;L=-1;R=50;T=-1;V=-1': (
     DriveState.stopped,
     AlertPriority.none,
   ),
@@ -128,6 +128,22 @@ void main() {
       expect(lineLost.hazards, {HazardType.lineLost});
       expect(lineLost.zone, AgvZone.unknown);
       expect(lineLost.sensors.tiltDeg, isNull);
+      expect(lineLost.sensors.leftDistanceCm, isNull);
+
+      // 우측 초음파는 이제 장착되어 있으므로 모든 예시에 실제 값이 있다.
+      for (final line in packetDocExamples.keys) {
+        expect(_p(line).sensors.rightDistanceCm, isNotNull, reason: line);
+      }
+      // TILT 예시는 Arduino 정지 기준(10° 초과)을 넘는 값.
+      final tilt = _p(
+        packetDocExamples.entries
+            .firstWhere((e) => e.value.$2 == AlertPriority.tilt)
+            .key,
+      );
+      expect(
+        tilt.sensors.tiltDeg,
+        greaterThan(SensorThresholds.tiltCriticalDeg),
+      );
     });
   });
 
@@ -172,15 +188,25 @@ void main() {
       expect(front(0), SensorLevel.critical);
     });
 
-    test('측면 ToF: 15 이상 정상 / 8~15 경고 / 8 미만 위험', () {
+    test('측면(좌 ToF / 우 초음파): 15 이상 정상 / 8~15 경고 / 8 미만 위험', () {
       expect(side(15), SensorLevel.safe);
       expect(side(14.9), SensorLevel.caution);
       expect(side(8), SensorLevel.caution);
       expect(side(7.9), SensorLevel.critical);
-      expect(
-        const SensorData(rightDistanceCm: 7.9).rightLevel,
-        SensorLevel.critical,
-      );
+      SensorLevel right(double v) => SensorData(rightDistanceCm: v).rightLevel;
+      expect(right(15), SensorLevel.safe);
+      expect(right(14.9), SensorLevel.caution);
+      expect(right(8), SensorLevel.caution);
+      expect(right(7.9), SensorLevel.critical);
+    });
+
+    test('기울기: 5° 이상 경고(앱 표시용) / 10° 초과 위험(Arduino TILT 기준)', () {
+      SensorLevel tilt(double v) => SensorData(tiltDeg: v).tiltLevel;
+      expect(tilt(0), SensorLevel.safe);
+      expect(tilt(4.9), SensorLevel.safe);
+      expect(tilt(5), SensorLevel.caution);
+      expect(tilt(10), SensorLevel.caution); // Arduino도 10°에서는 아직 정지 안 함
+      expect(tilt(10.1), SensorLevel.critical);
     });
   });
 }

@@ -148,7 +148,6 @@ class DummyAgvDataSource implements AgvDataSource {
       value == null ? null : _jitter(value, value * 0.03);
 
   // 센서 값은 [SensorThresholds] 기준으로 각 시나리오에 맞게 설정.
-  // 우측 ToF는 실제 AGV에서 사용하지 않으므로 null(미사용).
   static const _presets = <DriveState, _ScenarioPreset>{
     DriveState.normal: _ScenarioPreset(
       zone: AgvZone.zone1,
@@ -156,6 +155,7 @@ class DummyAgvDataSource implements AgvDataSource {
       sensors: SensorData(
         frontDistanceCm: 150,
         leftDistanceCm: 40,
+        rightDistanceCm: 42,
         tiltDeg: 1.2,
         vibrationG: 0.12,
       ),
@@ -166,6 +166,7 @@ class DummyAgvDataSource implements AgvDataSource {
       sensors: SensorData(
         frontDistanceCm: 40, // 20~50: 경고(감속)
         leftDistanceCm: 11, // 8~15: 경고
+        rightDistanceCm: 30,
         tiltDeg: 3.5,
         vibrationG: 0.38,
       ),
@@ -180,6 +181,7 @@ class DummyAgvDataSource implements AgvDataSource {
       sensors: SensorData(
         frontDistanceCm: 15, // 20 미만: 위험(정지)
         leftDistanceCm: 25,
+        rightDistanceCm: 20,
         tiltDeg: 12.5,
         vibrationG: 1.35,
       ),
@@ -190,6 +192,7 @@ class DummyAgvDataSource implements AgvDataSource {
       sensors: SensorData(
         frontDistanceCm: 6,
         leftDistanceCm: 6, // 8 미만: 위험
+        rightDistanceCm: 7,
         tiltDeg: 0.8,
         vibrationG: 0.05,
       ),
@@ -200,6 +203,7 @@ class DummyAgvDataSource implements AgvDataSource {
       sensors: SensorData(
         frontDistanceCm: 200,
         leftDistanceCm: 60,
+        rightDistanceCm: 55,
         tiltDeg: 0,
         vibrationG: 0,
       ),

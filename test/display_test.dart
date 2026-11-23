@@ -27,12 +27,17 @@ AgvStatus _packet(String line) => AgvPacketParser.parse(line)!;
 void main() {
   testWidgets('미사용 센서는 "미사용"으로 표시', (tester) async {
     await tester.pumpWidget(
-      _wrap(SensorCard(sensors: _packet('S=NORMAL;F=120;L=12;R=-1').sensors)),
+      _wrap(
+        SensorCard(sensors: _packet('S=NORMAL;F=120;L=12;R=30;T=-1').sensors),
+      ),
     );
     expect(find.text('120.0'), findsOneWidget);
     expect(find.text('12.0'), findsOneWidget);
-    // R=-1, T/V 필드 없음 → 3개.
-    expect(find.text('미사용'), findsNWidgets(3));
+    expect(find.text('30.0'), findsOneWidget);
+    expect(find.text('우측 초음파'), findsOneWidget);
+    expect(find.textContaining('ToF'), findsOneWidget); // 좌측만 ToF
+    // T=-1, V 필드 없음 → 2개.
+    expect(find.text('미사용'), findsNWidgets(2));
   });
 
   testWidgets('라인 이탈/모르는 위험 코드 표시', (tester) async {
