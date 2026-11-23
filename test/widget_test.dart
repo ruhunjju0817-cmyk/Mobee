@@ -5,6 +5,7 @@ import 'package:mobee/controllers/theme_controller.dart';
 import 'package:mobee/main.dart';
 import 'package:mobee/models/agv_enums.dart';
 import 'package:mobee/services/agv_packet_parser.dart';
+import 'package:mobee/services/bluetooth_agv_data_source.dart';
 import 'package:mobee/services/dummy_agv_data_source.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -80,5 +81,27 @@ void main() {
     expect(s.hazards, {HazardType.sideBlindSpot, HazardType.tilt});
     expect(s.sensors.leftDistanceCm, 25.0);
     expect(AgvPacketParser.parse('garbage'), isNull);
+  });
+
+  test('BT 수신 데이터를 \\n 기준으로 잘라 파싱', () async {
+    final source = BluetoothAgvDataSource(deviceName: 'HC-05');
+    final received = <DriveState>[];
+    final sub = source.statusStream.listen((s) => received.add(s.driveState));
+
+    // 패킷이 조각나서 오거나, 한 조각에 여러 줄 + \r\n이 섞여 와도 된다.
+    source.addReceivedText('Z=1;S=NOR');
+    source.addReceivedText('MAL;F=150\r\nZ=2;S=WARN\nGARBAGE\nZ=3;');
+    await Future<void>.delayed(Duration.zero);
+    expect(received, [DriveState.normal, DriveState.warning]);
+    source.addReceivedText('S=DANGER\n');
+    await Future<void>.delayed(Duration.zero);
+    expect(received, [
+      DriveState.normal,
+      DriveState.warning,
+      DriveState.danger,
+    ]);
+
+    await sub.cancel();
+    source.dispose();
   });
 }

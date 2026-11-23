@@ -48,6 +48,7 @@ class MonitorScreen extends StatelessWidget {
                 _ConnectionBadge(
                   sourceName: controller.sourceName,
                   connection: controller.connection,
+                  onReconnect: controller.start,
                 ),
                 const SizedBox(width: 10),
                 _ThemeToggle(theme: theme),
@@ -209,22 +210,33 @@ class _Title extends StatelessWidget {
   }
 }
 
+/// 데이터 소스 이름 + 연결 상태(연결 중/연결됨/끊김/연결 실패) 표시.
+/// 끊김·실패 상태에서 탭하면 다시 연결한다.
 class _ConnectionBadge extends StatelessWidget {
-  const _ConnectionBadge({required this.sourceName, required this.connection});
+  const _ConnectionBadge({
+    required this.sourceName,
+    required this.connection,
+    required this.onReconnect,
+  });
 
   final String sourceName;
   final ConnectionStatus connection;
+  final VoidCallback onReconnect;
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final color = switch (connection) {
-      ConnectionStatus.connected => AppColors.safe,
-      ConnectionStatus.connecting => AppColors.warning,
-      ConnectionStatus.error => AppColors.danger,
-      ConnectionStatus.disconnected => AppColors.inactive,
+    final (color, label) = switch (connection) {
+      ConnectionStatus.connected => (AppColors.safe, '연결됨'),
+      ConnectionStatus.connecting => (AppColors.warning, '연결 중'),
+      ConnectionStatus.error => (AppColors.danger, '연결 실패'),
+      ConnectionStatus.disconnected => (AppColors.inactive, '끊김'),
     };
-    return Container(
+    final canReconnect =
+        connection == ConnectionStatus.disconnected ||
+        connection == ConnectionStatus.error;
+    final badge = Container(
+      key: const ValueKey('connection-badge'),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
         color: p.surface,
@@ -252,8 +264,24 @@ class _ConnectionBadge extends StatelessWidget {
               letterSpacing: 1.2,
             ),
           ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: AppText.label(
+              p,
+            ).copyWith(color: color, fontWeight: FontWeight.w700),
+          ),
+          if (canReconnect) ...[
+            const SizedBox(width: 4),
+            Icon(Icons.refresh_rounded, size: 14, color: color),
+          ],
         ],
       ),
+    );
+    if (!canReconnect) return badge;
+    return Tooltip(
+      message: '다시 연결',
+      child: GestureDetector(onTap: onReconnect, child: badge),
     );
   }
 }

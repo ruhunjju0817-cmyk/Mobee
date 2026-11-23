@@ -1,4 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 클래식 블루투스(HC-05/06) SPP 연결 -->
+    <!-- Android 11 이하: 설치 시 권한 -->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <!-- Android 12 이상: 런타임 권한 ("근처 기기"). 페어링된 기기 조회/연결에 필요 -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
     <application
         android:label="MOBEE"
         android:name="${applicationName}"

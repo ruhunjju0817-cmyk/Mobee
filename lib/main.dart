@@ -16,11 +16,11 @@ Future<void> main() async {
 
 /// 사용할 데이터 소스를 생성한다.
 ///
-/// Bluetooth 구현 후에는 이 함수만 바꾸면 된다:
-/// ```dart
-/// return BluetoothAgvDataSource(deviceName: 'MOBEE-AGV');
-/// ```
+/// 실제 AGV(HC-05/06)로 전환하려면 아래 두 줄의 주석을 바꾸고,
+/// 상단에 `import 'services/bluetooth_agv_data_source.dart';`를 추가한다.
+/// deviceName은 휴대폰에 페어링된 블루투스 이름과 정확히 같아야 한다.
 AgvDataSource createDataSource() => DummyAgvDataSource();
+// AgvDataSource createDataSource() => BluetoothAgvDataSource(deviceName: 'HC-05');
 
 class MobeeApp extends StatefulWidget {
   const MobeeApp({super.key, this.dataSource, this.themeController});
