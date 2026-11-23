@@ -35,6 +35,32 @@ class BluetoothAgvDataSource implements AgvDataSource {
   final _lineBuffer = StringBuffer();
   bool _disposed = false;
 
+  /// 휴대폰에 페어링된 기기 목록. 권한 요청과 블루투스 켜기 요청을 먼저 수행한다.
+  ///
+  /// 기기 검색(discovery)은 하지 않으므로 휴대폰 설정에서 미리 페어링해야 한다.
+  /// 이름이 없는 기기는 [deviceName]으로 연결할 수 없어 제외한다.
+  ///
+  /// 실패 시 항상 사용자용 문구를 담은 [BluetoothConnectException]을 던진다.
+  static Future<List<PairedDevice>> loadPairedDevices() async {
+    try {
+      await _ensurePermission();
+      await _ensureBluetoothOn();
+      final bonded = await FlutterBluetoothSerial.instance.getBondedDevices();
+      return [
+        for (final d in bonded)
+          if (d.name case final name? when name.isNotEmpty)
+            PairedDevice(name: name, address: d.address),
+      ];
+    } on BluetoothConnectException {
+      rethrow;
+    } catch (e, st) {
+      logBluetoothError('페어링 기기 목록 조회 실패', e, st);
+      throw const BluetoothConnectException(
+        '페어링된 기기 목록을 불러올 수 없습니다. 블루투스가 켜져 있는지 확인하세요.',
+      );
+    }
+  }
+
   @override
   String get name => 'BLUETOOTH';
 
@@ -56,9 +82,7 @@ class BluetoothAgvDataSource implements AgvDataSource {
     _setConnection(ConnectionStatus.connecting);
 
     try {
-      await _ensurePermission();
-      await _ensureBluetoothOn();
-      final device = await _findBondedDevice();
+      final device = await _findPairedDevice();
 
       final connection = await BluetoothConnection.toAddress(device.address);
       if (_disposed) {
@@ -82,9 +106,13 @@ class BluetoothAgvDataSource implements AgvDataSource {
     } on BluetoothConnectException {
       _setConnection(ConnectionStatus.error);
       rethrow;
-    } catch (e) {
+    } catch (e, st) {
+      // PlatformException 등 원본은 디버그 로그로만 남기고 화면에는 짧은 문구만.
+      logBluetoothError('"$deviceName" 연결 실패', e, st);
       _setConnection(ConnectionStatus.error);
-      throw BluetoothConnectException('$deviceName 연결 실패: $e');
+      throw BluetoothConnectException(
+        '$deviceName에 연결할 수 없습니다. 모듈 전원과 페어링을 확인하세요.',
+      );
     }
   }
 
@@ -131,7 +159,7 @@ class BluetoothAgvDataSource implements AgvDataSource {
     }
   }
 
-  Future<void> _ensurePermission() async {
+  static Future<void> _ensurePermission() async {
     // Android 11 이하에서는 BLUETOOTH(설치 시 권한)만으로 충분하며,
     // permission_handler가 bluetoothConnect를 곧바로 granted로 돌려준다.
     final status = await Permission.bluetoothConnect.request();
@@ -145,7 +173,7 @@ class BluetoothAgvDataSource implements AgvDataSource {
     throw const BluetoothConnectException('블루투스(근처 기기) 권한이 필요합니다.');
   }
 
-  Future<void> _ensureBluetoothOn() async {
+  static Future<void> _ensureBluetoothOn() async {
     final bt = FlutterBluetoothSerial.instance;
     if (await bt.isEnabled ?? false) return;
     final enabled = await bt.requestEnable() ?? false;
@@ -154,9 +182,8 @@ class BluetoothAgvDataSource implements AgvDataSource {
     }
   }
 
-  Future<BluetoothDevice> _findBondedDevice() async {
-    final bonded = await FlutterBluetoothSerial.instance.getBondedDevices();
-    for (final d in bonded) {
+  Future<PairedDevice> _findPairedDevice() async {
+    for (final d in await loadPairedDevices()) {
       if (d.name == deviceName) return d;
     }
     throw BluetoothConnectException(
@@ -192,7 +219,15 @@ class BluetoothAgvDataSource implements AgvDataSource {
   }
 }
 
+/// 원본 에러/스택트레이스를 디버그 빌드 콘솔에만 남긴다 (릴리스 빌드에서는 출력 안 함).
+void logBluetoothError(String context, Object error, [StackTrace? stack]) {
+  if (!kDebugMode) return;
+  debugPrint('[Bluetooth] $context: $error');
+  if (stack != null) debugPrint(stack.toString());
+}
+
 /// 화면 상단 에러 배너에 그대로 표시되는 연결 실패 사유.
+/// 사용자가 읽을 짧은 문구만 담는다 (원본 예외 텍스트 금지).
 class BluetoothConnectException implements Exception {
   const BluetoothConnectException(this.message);
 
@@ -200,4 +235,22 @@ class BluetoothConnectException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// 휴대폰에 페어링된 블루투스 기기. UI가 플러그인 타입에 의존하지 않도록 분리.
+@immutable
+class PairedDevice {
+  const PairedDevice({required this.name, required this.address});
+
+  final String name;
+
+  /// MAC 주소 (예: "98:D3:31:F5:12:AB")
+  final String address;
+
+  @override
+  bool operator ==(Object other) =>
+      other is PairedDevice && other.name == name && other.address == address;
+
+  @override
+  int get hashCode => Object.hash(name, address);
 }

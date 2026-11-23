@@ -71,7 +71,7 @@ class DriveStateCard extends StatelessWidget {
             spacing: 6,
             runSpacing: 6,
             children: [
-              for (final s in DriveState.values)
+              for (final s in DriveState.known)
                 _StateChip(state: s, active: s == state),
             ],
           ),

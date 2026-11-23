@@ -16,9 +16,14 @@ class HazardCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final count = status.hazards.length;
+    final top = status.topAlert;
+    // Stopped/Unknown 상태라 우선순위 경보가 없으면 일반 위험 색(주황).
     final color = count == 0
         ? AppColors.safe
-        : HazardType.frontObstacle.activeColor(status.driveState);
+        : top == AlertPriority.none
+        ? HazardType.lineLost.activeColor(status.driveState)
+        : top.color;
+    final hasUnknown = status.hasHazard(HazardType.unknown);
     return SectionCard(
       index: 3,
       title: '위험 상태',
@@ -39,7 +44,11 @@ class HazardCard extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Text(
-                    count == 0 ? '감지된 위험 없음' : '위험 요소 감지',
+                    count == 0
+                        ? '감지된 위험 없음'
+                        : top == AlertPriority.none
+                        ? '위험 요소 감지'
+                        : '최우선 경보: ${top.label}',
                     strutStyle: AppText.strut(13, 1.4),
                     style: TextStyle(
                       color: count == 0 ? p.textSecondary : color,
@@ -56,6 +65,21 @@ class HazardCard extends StatelessWidget {
           _row(HazardType.frontObstacle, HazardType.sideBlindSpot),
           const SizedBox(height: 10),
           _row(HazardType.collision, HazardType.tilt),
+          const SizedBox(height: 10),
+          _tile(HazardType.lineLost),
+          if (hasUnknown) ...[
+            const SizedBox(height: 10),
+            Text(
+              '알 수 없는 위험 코드를 수신했습니다 (H 값 확인 필요)',
+              key: const ValueKey('unknown-hazard'),
+              style: TextStyle(
+                color: AppColors.alert,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+              ),
+            ),
+          ],
         ],
       ),
     );

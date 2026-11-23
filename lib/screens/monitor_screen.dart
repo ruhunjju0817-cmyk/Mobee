@@ -8,6 +8,7 @@ import '../models/agv_enums.dart';
 import '../services/agv_data_source.dart';
 import '../theme/app_theme.dart';
 import '../theme/status_style.dart';
+import '../widgets/connection_sheet.dart';
 import '../widgets/dashboard_background.dart';
 import '../widgets/drive_state_card.dart';
 import '../widgets/hazard_card.dart';
@@ -51,6 +52,8 @@ class MonitorScreen extends StatelessWidget {
                   onReconnect: controller.start,
                 ),
                 const SizedBox(width: 10),
+                _ConnectionButton(controller: controller),
+                const SizedBox(width: 8),
                 _ThemeToggle(theme: theme),
                 const SizedBox(width: 20),
               ],
@@ -62,7 +65,10 @@ class MonitorScreen extends StatelessWidget {
                   final zone = ZoneCard(zone: status.zone);
                   final drive = DriveStateCard(state: status.driveState);
                   final hazard = HazardCard(status: status);
-                  final sensor = SensorCard(sensors: status.sensors);
+                  final sensor = SensorCard(
+                    sensors: status.sensors,
+                    hasData: status.hasData,
+                  );
                   const gap = SizedBox(width: _gap, height: _gap);
 
                   final content = constraints.maxWidth >= _wideBreakpoint
@@ -99,10 +105,22 @@ class MonitorScreen extends StatelessWidget {
                           children: [
                             if (controller.errorMessage != null)
                               _ErrorBanner(message: controller.errorMessage!),
-                            content,
+                            if (controller.isStale)
+                              _StaleBanner(
+                                lastUpdate: status.hasData
+                                    ? status.timestamp
+                                    : null,
+                              ),
+                            // 패킷이 끊기면 마지막 값을 흐리게 보여 현재 값이 아님을 표시.
+                            AnimatedOpacity(
+                              key: const ValueKey('dashboard-content'),
+                              opacity: controller.isStale ? 0.35 : 1,
+                              duration: const Duration(milliseconds: 250),
+                              child: content,
+                            ),
                             const SizedBox(height: 20),
                             Text(
-                              'LAST UPDATE   ${_formatTime(status.timestamp)}',
+                              'LAST UPDATE   ${status.hasData ? _formatTime(status.timestamp) : '--:--:--'}',
                               textAlign: TextAlign.center,
                               style: AppText.label(p).copyWith(
                                 color: p.textMuted,
@@ -226,11 +244,12 @@ class _ConnectionBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final (color, label) = switch (connection) {
-      ConnectionStatus.connected => (AppColors.safe, '연결됨'),
-      ConnectionStatus.connecting => (AppColors.warning, '연결 중'),
-      ConnectionStatus.error => (AppColors.danger, '연결 실패'),
-      ConnectionStatus.disconnected => (AppColors.inactive, '끊김'),
+    final label = connection.label;
+    final color = switch (connection) {
+      ConnectionStatus.connected => AppColors.safe,
+      ConnectionStatus.connecting => AppColors.warning,
+      ConnectionStatus.error => AppColors.danger,
+      ConnectionStatus.disconnected => AppColors.inactive,
     };
     final canReconnect =
         connection == ConnectionStatus.disconnected ||
@@ -282,6 +301,55 @@ class _ConnectionBadge extends StatelessWidget {
     return Tooltip(
       message: '다시 연결',
       child: GestureDetector(onTap: onReconnect, child: badge),
+    );
+  }
+}
+
+/// 연결 시트를 여는 버튼. 아이콘으로 현재 소스/연결 상태를 함께 보여준다.
+class _ConnectionButton extends StatelessWidget {
+  const _ConnectionButton({required this.controller});
+
+  final MonitorController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final (icon, color) = !controller.isBluetooth
+        ? (Icons.bluetooth_rounded, p.textSecondary)
+        : switch (controller.connection) {
+            ConnectionStatus.connected => (
+              Icons.bluetooth_connected_rounded,
+              AppColors.safe,
+            ),
+            ConnectionStatus.connecting => (
+              Icons.bluetooth_searching_rounded,
+              AppColors.warning,
+            ),
+            ConnectionStatus.error => (
+              Icons.bluetooth_disabled_rounded,
+              AppColors.danger,
+            ),
+            ConnectionStatus.disconnected => (
+              Icons.bluetooth_disabled_rounded,
+              p.textMuted,
+            ),
+          };
+    return Tooltip(
+      message: '연결 관리',
+      child: Material(
+        color: p.surface,
+        shape: CircleBorder(side: BorderSide(color: p.border)),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: const ValueKey('connection-button'),
+          onTap: () => showConnectionSheet(context, controller),
+          child: SizedBox(
+            width: 38,
+            height: 38,
+            child: Icon(icon, size: 20, color: color),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -367,7 +435,7 @@ class _ScenarioBar extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                   child: Row(
                     children: [
-                      for (final s in DriveState.values) ...[
+                      for (final s in DriveState.known) ...[
                         Expanded(
                           child: _ScenarioButton(
                             state: s,
@@ -375,7 +443,7 @@ class _ScenarioBar extends StatelessWidget {
                             onTap: () => onSelected(s),
                           ),
                         ),
-                        if (s != DriveState.values.last)
+                        if (s != DriveState.known.last)
                           const SizedBox(width: 8),
                       ],
                     ],
@@ -460,6 +528,48 @@ class _ScenarioButton extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 블루투스 연결은 유지되는데 패킷이 끊겼을 때의 배너.
+class _StaleBanner extends StatelessWidget {
+  const _StaleBanner({required this.lastUpdate});
+
+  /// null이면 연결 후 패킷을 한 번도 받지 못함.
+  final DateTime? lastUpdate;
+
+  @override
+  Widget build(BuildContext context) {
+    final last = lastUpdate;
+    final detail = last == null
+        ? '연결 후 아직 수신된 패킷이 없습니다.'
+        : '아래는 마지막 수신 값입니다 (${MonitorScreen._formatTime(last)}).';
+    return Container(
+      key: const ValueKey('stale-banner'),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.7)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.portable_wifi_off_rounded, color: AppColors.warning),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '데이터 없음 — 2초 넘게 AGV 패킷이 수신되지 않았습니다.\n$detail',
+              style: const TextStyle(
+                color: AppColors.warning,
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

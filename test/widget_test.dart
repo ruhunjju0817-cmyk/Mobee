@@ -7,6 +7,8 @@ import 'package:mobee/models/agv_enums.dart';
 import 'package:mobee/services/agv_packet_parser.dart';
 import 'package:mobee/services/bluetooth_agv_data_source.dart';
 import 'package:mobee/services/dummy_agv_data_source.dart';
+import 'package:mobee/theme/app_theme.dart';
+import 'package:mobee/widgets/zone_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -82,6 +84,64 @@ void main() {
     expect(s.sensors.leftDistanceCm, 25.0);
     expect(AgvPacketParser.parse('garbage'), isNull);
   });
+
+  test('Z=4 파싱 및 범위 밖 Zone은 Unknown', () {
+    final s = AgvPacketParser.parse(
+      'Z=4;S=NORMAL;F=150;L=80;R=85;T=1.2;V=0.1',
+    )!;
+    expect(s.zone, AgvZone.zone4);
+    expect(s.zone.label, 'Zone 4');
+    expect(AgvPacketParser.parse('Z=5;S=NORMAL')!.zone, AgvZone.unknown);
+    expect(AgvPacketParser.parse('Z=;S=NORMAL')!.zone, AgvZone.unknown);
+  });
+
+  test('더미 Normal 순찰 중 Zone 4를 주기적으로 통과', () async {
+    final source = DummyAgvDataSource(tickInterval: const Duration(hours: 1));
+    final zones = <AgvZone>[];
+    final sub = source.statusStream.listen((s) => zones.add(s.zone));
+    await source.connect(); // 연결 직후 1회 방출
+    // 2주기(24틱) 진행.
+    for (var i = 0; i < DummyAgvDataSource.zone4Period * 2; i++) {
+      source.advanceTick();
+    }
+    await Future<void>.delayed(Duration.zero);
+    expect(zones.first, AgvZone.zone1);
+    expect(
+      zones.where((z) => z == AgvZone.zone4).length,
+      DummyAgvDataSource.zone4Duration * 2,
+    );
+    expect(zones.toSet(), {AgvZone.zone1, AgvZone.zone4});
+
+    // Normal이 아닌 시나리오는 프리셋 Zone 그대로.
+    source.setScenario(DriveState.danger);
+    await Future<void>.delayed(Duration.zero);
+    expect(zones.last, AgvZone.zone3);
+    await sub.cancel();
+    source.dispose();
+  });
+
+  for (final width in [320.0, 360.0]) {
+    testWidgets('Zone 카드 4칩: ${width.toInt()}dp에서 넘치지 않음', (tester) async {
+      tester.view.physicalSize = Size(width, 400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: const Scaffold(
+            body: Padding(
+              padding: EdgeInsets.all(20),
+              child: ZoneCard(zone: AgvZone.zone4),
+            ),
+          ),
+        ),
+      );
+      for (final z in ['Z1', 'Z2', 'Z3', 'Z4']) {
+        expect(find.text(z), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   test('BT 수신 데이터를 \\n 기준으로 잘라 파싱', () async {
     final source = BluetoothAgvDataSource(deviceName: 'HC-05');

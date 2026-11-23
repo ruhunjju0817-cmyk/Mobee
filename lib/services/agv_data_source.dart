@@ -1,6 +1,16 @@
 import '../models/agv_status.dart';
 
-enum ConnectionStatus { disconnected, connecting, connected, error }
+enum ConnectionStatus {
+  disconnected('끊김'),
+  connecting('연결 중'),
+  connected('연결됨'),
+  error('연결 실패');
+
+  const ConnectionStatus(this.label);
+
+  /// 화면 표시용 한글 이름.
+  final String label;
+}
 
 /// AGV 데이터 공급원 인터페이스.
 ///

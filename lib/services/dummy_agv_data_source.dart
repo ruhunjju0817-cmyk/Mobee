@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
+
 import '../models/agv_enums.dart';
 import '../models/agv_status.dart';
 import '../models/sensor_data.dart';
@@ -33,6 +35,14 @@ class DummyAgvDataSource implements AgvDataSource {
   DriveState _scenario = DriveState.normal;
   Timer? _timer;
 
+  /// 타이머 틱 수. Normal 순찰 중 Zone 4 통과 시점 계산용.
+  int _tick = 0;
+
+  /// Normal 시나리오에서 [zone4Period] 틱마다 마지막 [zone4Duration] 틱 동안
+  /// Zone 4 구간을 지나간다 (예: 12초 중 3초). 시작 직후는 항상 Zone 1.
+  static const zone4Period = 12;
+  static const zone4Duration = 3;
+
   @override
   String get name => 'DUMMY';
 
@@ -40,8 +50,7 @@ class DummyAgvDataSource implements AgvDataSource {
   Stream<AgvStatus> get statusStream => _statusController.stream;
 
   @override
-  Stream<ConnectionStatus> get connectionStream =>
-      _connectionController.stream;
+  Stream<ConnectionStatus> get connectionStream => _connectionController.stream;
 
   @override
   ConnectionStatus get connectionStatus => _connectionStatus;
@@ -53,7 +62,7 @@ class DummyAgvDataSource implements AgvDataSource {
     if (_connectionStatus == ConnectionStatus.connected) return;
     _setConnection(ConnectionStatus.connected);
     _emit();
-    _timer = Timer.periodic(tickInterval, (_) => _emit());
+    _timer = Timer.periodic(tickInterval, (_) => advanceTick());
   }
 
   @override
@@ -86,6 +95,13 @@ class DummyAgvDataSource implements AgvDataSource {
     _emit();
   }
 
+  /// 타이머 한 틱 진행 (테스트에서 시간 대기 없이 호출 가능).
+  @visibleForTesting
+  void advanceTick() {
+    _tick++;
+    _emit();
+  }
+
   void _setConnection(ConnectionStatus status) {
     _connectionStatus = status;
     if (!_connectionController.isClosed) _connectionController.add(status);
@@ -98,17 +114,18 @@ class DummyAgvDataSource implements AgvDataSource {
   }
 
   AgvStatus _buildStatus(DriveState scenario) {
-    final preset = _presets[scenario]!;
+    // Unknown 등 프리셋이 없는 상태는 정지 프리셋 값으로.
+    final preset = _presets[scenario] ?? _presets[DriveState.stopped]!;
     final s = preset.sensors;
     final moving = scenario != DriveState.stopped;
     return AgvStatus(
-      zone: preset.zone,
+      zone: _zoneFor(scenario, preset.zone),
       driveState: scenario,
       hazards: preset.hazards,
       sensors: SensorData(
-        frontDistanceCm: _jitter(s.frontDistanceCm, s.frontDistanceCm * 0.03),
-        leftDistanceCm: _jitter(s.leftDistanceCm, s.leftDistanceCm * 0.03),
-        rightDistanceCm: _jitter(s.rightDistanceCm, s.rightDistanceCm * 0.03),
+        frontDistanceCm: _jitterPct(s.frontDistanceCm),
+        leftDistanceCm: _jitterPct(s.leftDistanceCm),
+        rightDistanceCm: _jitterPct(s.rightDistanceCm),
         tiltDeg: moving ? _jitter(s.tiltDeg, 0.3) : s.tiltDeg,
         vibrationG: moving ? _jitter(s.vibrationG, 0.04) : 0,
       ),
@@ -116,17 +133,29 @@ class DummyAgvDataSource implements AgvDataSource {
     );
   }
 
-  double _jitter(double value, double amount) =>
-      max(0, value + (_random.nextDouble() * 2 - 1) * amount);
+  AgvZone _zoneFor(DriveState scenario, AgvZone presetZone) {
+    if (scenario != DriveState.normal) return presetZone;
+    final inZone4 = _tick % zone4Period >= zone4Period - zone4Duration;
+    return inZone4 ? AgvZone.zone4 : presetZone;
+  }
 
+  /// null(미사용 센서)은 그대로 둔다.
+  double? _jitter(double? value, double amount) => value == null
+      ? null
+      : max(0, value + (_random.nextDouble() * 2 - 1) * amount);
+
+  double? _jitterPct(double? value) =>
+      value == null ? null : _jitter(value, value * 0.03);
+
+  // 센서 값은 [SensorThresholds] 기준으로 각 시나리오에 맞게 설정.
+  // 우측 ToF는 실제 AGV에서 사용하지 않으므로 null(미사용).
   static const _presets = <DriveState, _ScenarioPreset>{
     DriveState.normal: _ScenarioPreset(
       zone: AgvZone.zone1,
       hazards: {},
       sensors: SensorData(
         frontDistanceCm: 150,
-        leftDistanceCm: 80,
-        rightDistanceCm: 85,
+        leftDistanceCm: 40,
         tiltDeg: 1.2,
         vibrationG: 0.12,
       ),
@@ -135,9 +164,8 @@ class DummyAgvDataSource implements AgvDataSource {
       zone: AgvZone.zone2,
       hazards: {HazardType.sideBlindSpot},
       sensors: SensorData(
-        frontDistanceCm: 95,
-        leftDistanceCm: 25,
-        rightDistanceCm: 70,
+        frontDistanceCm: 40, // 20~50: 경고(감속)
+        leftDistanceCm: 11, // 8~15: 경고
         tiltDeg: 3.5,
         vibrationG: 0.38,
       ),
@@ -150,9 +178,8 @@ class DummyAgvDataSource implements AgvDataSource {
         HazardType.tilt,
       },
       sensors: SensorData(
-        frontDistanceCm: 18,
-        leftDistanceCm: 50,
-        rightDistanceCm: 35,
+        frontDistanceCm: 15, // 20 미만: 위험(정지)
+        leftDistanceCm: 25,
         tiltDeg: 12.5,
         vibrationG: 1.35,
       ),
@@ -162,19 +189,17 @@ class DummyAgvDataSource implements AgvDataSource {
       hazards: {HazardType.frontObstacle},
       sensors: SensorData(
         frontDistanceCm: 6,
-        leftDistanceCm: 30,
-        rightDistanceCm: 28,
+        leftDistanceCm: 6, // 8 미만: 위험
         tiltDeg: 0.8,
         vibrationG: 0.05,
       ),
     ),
     DriveState.stopped: _ScenarioPreset(
       zone: AgvZone.unknown,
-      hazards: {},
+      hazards: {HazardType.lineLost},
       sensors: SensorData(
         frontDistanceCm: 200,
-        leftDistanceCm: 100,
-        rightDistanceCm: 100,
+        leftDistanceCm: 60,
         tiltDeg: 0,
         vibrationG: 0,
       ),

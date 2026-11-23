@@ -1,95 +1,92 @@
-/// 센서값의 위험 수준.
-enum SensorLevel { safe, caution, critical }
+import 'sensor_thresholds.dart';
 
-/// 센서별 경고/위험 임계값.
-class SensorThresholds {
-  const SensorThresholds._();
+export 'sensor_thresholds.dart';
 
-  static const double frontCautionCm = 80;
-  static const double frontCriticalCm = 30;
-  static const double sideCautionCm = 40;
-  static const double sideCriticalCm = 15;
-  static const double tiltCautionDeg = 5;
-  static const double tiltCriticalDeg = 10;
-  static const double vibrationCautionG = 0.5;
-  static const double vibrationCriticalG = 1.0;
-}
+/// 센서값의 위험 수준. [unused]는 센서 미사용/값 없음.
+enum SensorLevel { safe, caution, critical, unused }
 
 /// AGV 센서 측정값.
+///
+/// 각 값이 null이면 그 센서는 미사용(패킷에서 -1 또는 필드 없음)이다.
+/// 예: 우측 ToF 미장착, IMU 미연결.
 class SensorData {
   const SensorData({
-    required this.frontDistanceCm,
-    required this.leftDistanceCm,
-    required this.rightDistanceCm,
-    required this.tiltDeg,
-    required this.vibrationG,
+    this.frontDistanceCm,
+    this.leftDistanceCm,
+    this.rightDistanceCm,
+    this.tiltDeg,
+    this.vibrationG,
   });
 
-  static const zero = SensorData(
-    frontDistanceCm: 0,
-    leftDistanceCm: 0,
-    rightDistanceCm: 0,
-    tiltDeg: 0,
-    vibrationG: 0,
-  );
+  /// 모든 값 없음. 아직 패킷을 받지 않은 초기 상태에 사용.
+  static const empty = SensorData();
 
-  /// 전방 초음파/라이다 거리 (cm)
-  final double frontDistanceCm;
+  /// 정면 초음파 거리 (cm)
+  final double? frontDistanceCm;
 
-  /// 좌측 거리 (cm)
-  final double leftDistanceCm;
+  /// 좌측 ToF 거리 (cm)
+  final double? leftDistanceCm;
 
-  /// 우측 거리 (cm)
-  final double rightDistanceCm;
+  /// 우측 ToF 거리 (cm)
+  final double? rightDistanceCm;
 
-  /// IMU 기울기 (deg)
-  final double tiltDeg;
+  /// IMU 기울기 크기 (deg, 0 이상)
+  final double? tiltDeg;
 
   /// 진동 (g)
-  final double vibrationG;
+  final double? vibrationG;
 
-  SensorLevel get frontLevel => _distanceLevel(frontDistanceCm,
-      SensorThresholds.frontCautionCm, SensorThresholds.frontCriticalCm);
+  SensorLevel get frontLevel => _distanceLevel(
+    frontDistanceCm,
+    SensorThresholds.frontCautionCm,
+    SensorThresholds.frontCriticalCm,
+  );
 
-  SensorLevel get leftLevel => _distanceLevel(leftDistanceCm,
-      SensorThresholds.sideCautionCm, SensorThresholds.sideCriticalCm);
+  SensorLevel get leftLevel => _distanceLevel(
+    leftDistanceCm,
+    SensorThresholds.sideCautionCm,
+    SensorThresholds.sideCriticalCm,
+  );
 
-  SensorLevel get rightLevel => _distanceLevel(rightDistanceCm,
-      SensorThresholds.sideCautionCm, SensorThresholds.sideCriticalCm);
+  SensorLevel get rightLevel => _distanceLevel(
+    rightDistanceCm,
+    SensorThresholds.sideCautionCm,
+    SensorThresholds.sideCriticalCm,
+  );
 
-  SensorLevel get tiltLevel => _magnitudeLevel(tiltDeg.abs(),
-      SensorThresholds.tiltCautionDeg, SensorThresholds.tiltCriticalDeg);
+  SensorLevel get tiltLevel => _magnitudeLevel(
+    tiltDeg?.abs(),
+    SensorThresholds.tiltCautionDeg,
+    SensorThresholds.tiltCriticalDeg,
+  );
 
-  SensorLevel get vibrationLevel => _magnitudeLevel(vibrationG,
-      SensorThresholds.vibrationCautionG, SensorThresholds.vibrationCriticalG);
+  SensorLevel get vibrationLevel => _magnitudeLevel(
+    vibrationG,
+    SensorThresholds.vibrationCautionG,
+    SensorThresholds.vibrationCriticalG,
+  );
 
+  /// 거리: 가까울수록 위험. 임계값 **미만**이면 해당 단계.
   static SensorLevel _distanceLevel(
-      double value, double caution, double critical) {
-    if (value <= critical) return SensorLevel.critical;
-    if (value <= caution) return SensorLevel.caution;
+    double? value,
+    double caution,
+    double critical,
+  ) {
+    if (value == null) return SensorLevel.unused;
+    if (value < critical) return SensorLevel.critical;
+    if (value < caution) return SensorLevel.caution;
     return SensorLevel.safe;
   }
 
+  /// 기울기/진동: 클수록 위험. 임계값 **이상**이면 해당 단계.
   static SensorLevel _magnitudeLevel(
-      double value, double caution, double critical) {
+    double? value,
+    double caution,
+    double critical,
+  ) {
+    if (value == null) return SensorLevel.unused;
     if (value >= critical) return SensorLevel.critical;
     if (value >= caution) return SensorLevel.caution;
     return SensorLevel.safe;
-  }
-
-  SensorData copyWith({
-    double? frontDistanceCm,
-    double? leftDistanceCm,
-    double? rightDistanceCm,
-    double? tiltDeg,
-    double? vibrationG,
-  }) {
-    return SensorData(
-      frontDistanceCm: frontDistanceCm ?? this.frontDistanceCm,
-      leftDistanceCm: leftDistanceCm ?? this.leftDistanceCm,
-      rightDistanceCm: rightDistanceCm ?? this.rightDistanceCm,
-      tiltDeg: tiltDeg ?? this.tiltDeg,
-      vibrationG: vibrationG ?? this.vibrationG,
-    );
   }
 }

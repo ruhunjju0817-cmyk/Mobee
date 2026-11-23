@@ -11,7 +11,11 @@ class ZoneCard extends StatelessWidget {
 
   final AgvZone zone;
 
-  static const _mapZones = [AgvZone.zone1, AgvZone.zone2, AgvZone.zone3];
+  /// 하단 구역 칩. RFID 구역이 늘면 [AgvZone]에만 추가하면 된다.
+  static final _mapZones = [
+    for (final z in AgvZone.values)
+      if (z != AgvZone.unknown) z,
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +73,7 @@ class ZoneCard extends StatelessWidget {
                 Expanded(
                   child: _ZoneCell(zone: z, active: z == zone),
                 ),
-                if (z != _mapZones.last) const SizedBox(width: 10),
+                if (z != _mapZones.last) const SizedBox(width: 8),
               ],
             ],
           ),
@@ -106,23 +110,28 @@ class _ZoneCell extends StatelessWidget {
             ? [BoxShadow(color: p.glow(color, 0.2), blurRadius: 12)]
             : null,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (active) ...[
-            Icon(Icons.navigation_rounded, size: 14, color: color),
-            const SizedBox(width: 6),
-          ],
-          Text(
-            'Z${zone.code}',
-            style: TextStyle(
-              color: active ? p.textPrimary : p.textMuted,
-              fontSize: 13,
-              fontWeight: active ? FontWeight.w700 : FontWeight.w600,
-              letterSpacing: 1,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      // 좁은 화면/큰 글씨 설정에서도 칩 안에서 넘치지 않도록 축소.
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (active) ...[
+              Icon(Icons.navigation_rounded, size: 14, color: color),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              'Z${zone.code}',
+              style: TextStyle(
+                color: active ? p.textPrimary : p.textMuted,
+                fontSize: 13,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+                letterSpacing: 1,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

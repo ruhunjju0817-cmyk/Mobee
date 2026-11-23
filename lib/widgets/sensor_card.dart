@@ -7,9 +7,12 @@ import 'section_card.dart';
 
 /// ④ 센서값 표시.
 class SensorCard extends StatelessWidget {
-  const SensorCard({super.key, required this.sensors});
+  const SensorCard({super.key, required this.sensors, this.hasData = true});
 
   final SensorData sensors;
+
+  /// false면 아직 패킷을 받지 않은 상태 → 모든 값을 "-"로 표시 ("미사용"과 구분).
+  final bool hasData;
 
   @override
   Widget build(BuildContext context) {
@@ -20,30 +23,34 @@ class SensorCard extends StatelessWidget {
       child: Column(
         children: [
           _SensorRow(
+            hasData: hasData,
             icon: Icons.north_rounded,
-            label: '전방 거리',
+            label: '정면 초음파',
             value: sensors.frontDistanceCm,
             unit: 'cm',
             max: 200,
             level: sensors.frontLevel,
           ),
           _SensorRow(
+            hasData: hasData,
             icon: Icons.west_rounded,
-            label: '좌측 거리',
+            label: '좌측 ToF',
             value: sensors.leftDistanceCm,
             unit: 'cm',
-            max: 100,
+            max: 50,
             level: sensors.leftLevel,
           ),
           _SensorRow(
+            hasData: hasData,
             icon: Icons.east_rounded,
-            label: '우측 거리',
+            label: '우측 ToF',
             value: sensors.rightDistanceCm,
             unit: 'cm',
-            max: 100,
+            max: 50,
             level: sensors.rightLevel,
           ),
           _SensorRow(
+            hasData: hasData,
             icon: Icons.straighten_rounded,
             label: 'IMU 기울기',
             value: sensors.tiltDeg,
@@ -52,6 +59,7 @@ class SensorCard extends StatelessWidget {
             level: sensors.tiltLevel,
           ),
           _SensorRow(
+            hasData: hasData,
             icon: Icons.vibration_rounded,
             label: '진동',
             value: sensors.vibrationG,
@@ -69,6 +77,7 @@ class SensorCard extends StatelessWidget {
 
 class _SensorRow extends StatelessWidget {
   const _SensorRow({
+    required this.hasData,
     required this.icon,
     required this.label,
     required this.value,
@@ -81,7 +90,11 @@ class _SensorRow extends StatelessWidget {
 
   final IconData icon;
   final String label;
-  final double value;
+
+  final bool hasData;
+
+  /// null이면 미사용 센서 (패킷에서 -1 또는 필드 없음). [hasData]가 false면 값 없음.
+  final double? value;
   final String unit;
 
   /// 게이지 바의 최대값.
@@ -94,6 +107,7 @@ class _SensorRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final color = level.color;
+    final v = value;
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
       child: Column(
@@ -115,17 +129,34 @@ class _SensorRow extends StatelessWidget {
                   ),
                 ),
               ),
-              Text(
-                value.toStringAsFixed(fractionDigits),
-                strutStyle: AppText.strut(20),
-                style: AppText.value(p, color, size: 20),
-              ),
+              if (v == null)
+                Text(
+                  hasData ? '미사용' : '-',
+                  strutStyle: AppText.strut(20),
+                  style: TextStyle(
+                    color: p.textMuted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+              else
+                Text(
+                  v.toStringAsFixed(fractionDigits),
+                  strutStyle: AppText.strut(20),
+                  style: AppText.value(p, color, size: 20),
+                ),
               const SizedBox(width: 4),
-              SizedBox(width: 22, child: Text(unit, style: AppText.unit(p))),
+              SizedBox(
+                width: 22,
+                child: Text(v == null ? '' : unit, style: AppText.unit(p)),
+              ),
             ],
           ),
           const SizedBox(height: 8),
-          _Gauge(fraction: (value / max).clamp(0.0, 1.0), color: color),
+          _Gauge(
+            fraction: v == null ? 0 : (v / max).clamp(0.0, 1.0),
+            color: color,
+          ),
         ],
       ),
     );

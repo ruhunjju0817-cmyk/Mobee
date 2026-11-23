@@ -11,6 +11,7 @@ extension DriveStateStyle on DriveState {
     DriveState.danger => AppColors.alert,
     DriveState.blocked => AppColors.danger,
     DriveState.stopped => AppColors.inactive,
+    DriveState.unknown => AppColors.inactive,
   };
 
   IconData get icon => switch (this) {
@@ -19,6 +20,7 @@ extension DriveStateStyle on DriveState {
     DriveState.danger => Icons.dangerous_rounded,
     DriveState.blocked => Icons.block_rounded,
     DriveState.stopped => Icons.pause_circle_filled_rounded,
+    DriveState.unknown => Icons.help_rounded,
   };
 }
 
@@ -33,20 +35,39 @@ extension HazardTypeStyle on HazardType {
     HazardType.sideBlindSpot => Icons.visibility_off_rounded,
     HazardType.collision => Icons.car_crash_rounded,
     HazardType.tilt => Icons.rotate_right_rounded,
+    HazardType.lineLost => Icons.alt_route_rounded,
+    HazardType.unknown => Icons.help_outline_rounded,
   };
 
   /// 활성화된 위험 요소의 색상.
-  /// 충돌은 항상 빨강, 나머지는 전체 주행 상태 색을 따른다
-  /// (Warning 노랑, Danger 주황, Blocked 빨강). Normal/Stopped 중 감지 시 주황.
+  /// 충돌·기울기는 Blocked보다 우선순위가 높으므로 항상 빨강.
+  /// 나머지는 전체 주행 상태 색을 따른다 (Warning 노랑, Danger 주황, Blocked 빨강).
+  /// Normal/Stopped/Unknown 중 감지 시 주황.
   Color activeColor(DriveState state) {
-    if (this == HazardType.collision) return AppColors.danger;
+    if (this == HazardType.collision || this == HazardType.tilt) {
+      return AppColors.danger;
+    }
     return switch (state) {
       DriveState.warning ||
       DriveState.danger ||
       DriveState.blocked => state.color,
-      DriveState.normal || DriveState.stopped => AppColors.alert,
+      DriveState.normal ||
+      DriveState.stopped ||
+      DriveState.unknown => AppColors.alert,
     };
   }
+}
+
+extension AlertPriorityStyle on AlertPriority {
+  Color get color => switch (this) {
+    AlertPriority.collision ||
+    AlertPriority.tilt ||
+    AlertPriority.blocked => AppColors.danger,
+    AlertPriority.danger => AppColors.alert,
+    AlertPriority.warning => AppColors.warning,
+    AlertPriority.normal => AppColors.safe,
+    AlertPriority.none => AppColors.inactive,
+  };
 }
 
 extension SensorLevelStyle on SensorLevel {
@@ -54,5 +75,6 @@ extension SensorLevelStyle on SensorLevel {
     SensorLevel.safe => AppColors.safe,
     SensorLevel.caution => AppColors.warning,
     SensorLevel.critical => AppColors.danger,
+    SensorLevel.unused => AppColors.inactive,
   };
 }

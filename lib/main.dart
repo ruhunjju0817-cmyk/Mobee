@@ -1,5 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
+import 'controllers/connection_prefs.dart';
 import 'controllers/monitor_controller.dart';
 import 'controllers/theme_controller.dart';
 import 'screens/monitor_screen.dart';
@@ -11,25 +12,32 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // 첫 화면부터 저장된 테마로 그리도록 runApp 전에 불러온다.
   final theme = await ThemeController.load();
-  runApp(MobeeApp(themeController: theme));
+  final connectionPrefs = await ConnectionPrefs.load();
+  runApp(MobeeApp(themeController: theme, connectionPrefs: connectionPrefs));
 }
 
-/// 사용할 데이터 소스를 생성한다.
+/// 앱 시작 시 데이터 소스. 항상 더미로 시작한다.
 ///
-/// 실제 AGV(HC-05/06)로 전환하려면 아래 두 줄의 주석을 바꾸고,
-/// 상단에 `import 'services/bluetooth_agv_data_source.dart';`를 추가한다.
-/// deviceName은 휴대폰에 페어링된 블루투스 이름과 정확히 같아야 한다.
+/// 블루투스(HC-05/06) 연결은 상단 연결 버튼의 시트에서 고르며,
+/// 마지막으로 연결한 기기가 저장돼 있으면 시작 직후 자동 연결을 시도한다.
 AgvDataSource createDataSource() => DummyAgvDataSource();
-// AgvDataSource createDataSource() => BluetoothAgvDataSource(deviceName: 'HC-05');
 
 class MobeeApp extends StatefulWidget {
-  const MobeeApp({super.key, this.dataSource, this.themeController});
+  const MobeeApp({
+    super.key,
+    this.dataSource,
+    this.themeController,
+    this.connectionPrefs,
+  });
 
   /// 테스트 등에서 데이터 소스를 주입할 때 사용. null이면 [createDataSource].
   final AgvDataSource? dataSource;
 
   /// null이면 저장하지 않는 라이트 테마 컨트롤러를 사용 (테스트용).
   final ThemeController? themeController;
+
+  /// 마지막 연결 기기 저장소. null이면 저장하지 않음 (자동 연결 없음, 테스트용).
+  final ConnectionPrefs? connectionPrefs;
 
   @override
   State<MobeeApp> createState() => _MobeeAppState();
@@ -42,8 +50,12 @@ class _MobeeAppState extends State<MobeeApp> {
   @override
   void initState() {
     super.initState();
-    _controller = MonitorController(widget.dataSource ?? createDataSource())
-      ..start();
+    _controller = MonitorController(
+      widget.dataSource ?? createDataSource(),
+      prefs: widget.connectionPrefs,
+    );
+    // 더미로 먼저 화면을 채운 뒤, 저장된 기기가 있으면 그쪽으로 연결 시도.
+    _controller.start().then((_) => _controller.autoConnectLastDevice());
     _theme = widget.themeController ?? ThemeController();
   }
 
