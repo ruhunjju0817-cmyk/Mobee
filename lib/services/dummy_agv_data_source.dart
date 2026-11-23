@@ -148,14 +148,14 @@ class DummyAgvDataSource implements AgvDataSource {
       value == null ? null : _jitter(value, value * 0.03);
 
   // 센서 값은 [SensorThresholds] 기준으로 각 시나리오에 맞게 설정.
+  // 좌측에는 센서가 없으므로 leftDistanceCm은 null(미사용). 측면 ToF는 우측.
   static const _presets = <DriveState, _ScenarioPreset>{
     DriveState.normal: _ScenarioPreset(
       zone: AgvZone.zone1,
       hazards: {},
       sensors: SensorData(
         frontDistanceCm: 150,
-        leftDistanceCm: 40,
-        rightDistanceCm: 42,
+        rightDistanceCm: 40,
         tiltDeg: 1.2,
         vibrationG: 0.12,
       ),
@@ -165,8 +165,7 @@ class DummyAgvDataSource implements AgvDataSource {
       hazards: {HazardType.sideBlindSpot},
       sensors: SensorData(
         frontDistanceCm: 40, // 20~50: 경고(감속)
-        leftDistanceCm: 11, // 8~15: 경고
-        rightDistanceCm: 30,
+        rightDistanceCm: 11, // 8~15: 경고
         tiltDeg: 3.5,
         vibrationG: 0.38,
       ),
@@ -180,8 +179,7 @@ class DummyAgvDataSource implements AgvDataSource {
       },
       sensors: SensorData(
         frontDistanceCm: 15, // 20 미만: 위험(정지)
-        leftDistanceCm: 25,
-        rightDistanceCm: 20,
+        rightDistanceCm: 25,
         tiltDeg: 12.5,
         vibrationG: 1.35,
       ),
@@ -191,8 +189,7 @@ class DummyAgvDataSource implements AgvDataSource {
       hazards: {HazardType.frontObstacle},
       sensors: SensorData(
         frontDistanceCm: 6,
-        leftDistanceCm: 6, // 8 미만: 위험
-        rightDistanceCm: 7,
+        rightDistanceCm: 6, // 8 미만: 위험
         tiltDeg: 0.8,
         vibrationG: 0.05,
       ),
@@ -202,8 +199,7 @@ class DummyAgvDataSource implements AgvDataSource {
       hazards: {HazardType.lineLost},
       sensors: SensorData(
         frontDistanceCm: 200,
-        leftDistanceCm: 60,
-        rightDistanceCm: 55,
+        rightDistanceCm: 60,
         tiltDeg: 0,
         vibrationG: 0,
       ),

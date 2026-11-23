@@ -8,31 +8,31 @@ AgvStatus _p(String line) => AgvPacketParser.parse(line)!;
 
 /// docs/PACKET.md의 "상태별 예시 패킷"과 동일하게 유지할 것.
 const packetDocExamples = <String, (DriveState, AlertPriority)>{
-  'Z=1;S=NORMAL;H=;F=150;L=40;R=45;T=1.2;V=0.12': (
+  'Z=1;S=NORMAL;H=;F=150;L=-1;R=40;T=1.2;V=0.12': (
     DriveState.normal,
     AlertPriority.normal,
   ),
-  'Z=2;S=WARN;H=SIDE;F=40;L=11;R=35;T=3.5;V=0.38': (
+  'Z=2;S=WARN;H=SIDE;F=40;L=-1;R=11;T=3.5;V=0.38': (
     DriveState.warning,
     AlertPriority.warning,
   ),
-  'Z=3;S=DANGER;H=FRONT;F=15;L=25;R=30;T=2.0;V=0.60': (
+  'Z=3;S=DANGER;H=FRONT;F=15;L=-1;R=25;T=2.0;V=0.60': (
     DriveState.danger,
     AlertPriority.danger,
   ),
-  'Z=2;S=BLOCK;H=FRONT;F=6;L=6;R=7;T=0.8;V=0.05': (
+  'Z=2;S=BLOCK;H=FRONT;F=6;L=-1;R=6;T=0.8;V=0.05': (
     DriveState.blocked,
     AlertPriority.blocked,
   ),
-  'Z=4;S=STOP;H=;F=200;L=60;R=60;T=0;V=0': (
+  'Z=4;S=STOP;H=;F=200;L=-1;R=60;T=0;V=0': (
     DriveState.stopped,
     AlertPriority.none,
   ),
-  'Z=3;S=STOP;H=COLLISION;F=3;L=20;R=18;T=1.0;V=1.80': (
+  'Z=3;S=STOP;H=COLLISION;F=3;L=-1;R=20;T=1.0;V=1.80': (
     DriveState.stopped,
     AlertPriority.collision,
   ),
-  'Z=2;S=STOP;H=TILT;F=120;L=30;R=30;T=14.0;V=0.40': (
+  'Z=2;S=STOP;H=TILT;F=120;L=-1;R=30;T=14.0;V=0.40': (
     DriveState.stopped,
     AlertPriority.tilt,
   ),
@@ -87,13 +87,13 @@ void main() {
     });
 
     test('센서: -1/음수/숫자 아님/필드 없음 → 미사용(null)', () {
-      final s = _p('S=NORMAL;F=0;L=12.5;R=-1;V=abc').sensors;
+      final s = _p('S=NORMAL;F=0;L=-1;R=12.5;V=abc').sensors;
       expect(s.frontDistanceCm, 0);
-      expect(s.leftDistanceCm, 12.5);
-      expect(s.rightDistanceCm, isNull);
+      expect(s.rightDistanceCm, 12.5);
+      expect(s.leftDistanceCm, isNull);
       expect(s.tiltDeg, isNull); // 필드 없음
       expect(s.vibrationG, isNull); // 숫자 아님
-      expect(s.rightLevel, SensorLevel.unused);
+      expect(s.leftLevel, SensorLevel.unused);
       expect(s.tiltLevel, SensorLevel.unused);
 
       final odd = _p('S=NORMAL;F=-5;T=NaN;V=Infinity').sensors;
@@ -128,11 +128,13 @@ void main() {
       expect(lineLost.hazards, {HazardType.lineLost});
       expect(lineLost.zone, AgvZone.unknown);
       expect(lineLost.sensors.tiltDeg, isNull);
-      expect(lineLost.sensors.leftDistanceCm, isNull);
 
-      // 우측 초음파는 이제 장착되어 있으므로 모든 예시에 실제 값이 있다.
+      // 센서 구성: 정면 초음파 + 우측 ToF. 좌측은 미장착이므로 모든 예시가 L=-1.
       for (final line in packetDocExamples.keys) {
-        expect(_p(line).sensors.rightDistanceCm, isNotNull, reason: line);
+        final sensors = _p(line).sensors;
+        expect(sensors.leftDistanceCm, isNull, reason: line);
+        expect(sensors.rightDistanceCm, isNotNull, reason: line);
+        expect(sensors.frontDistanceCm, isNotNull, reason: line);
       }
       // TILT 예시는 Arduino 정지 기준(10° 초과)을 넘는 값.
       final tilt = _p(
@@ -177,7 +179,7 @@ void main() {
 
   group('임계값 (Arduino와 동일)', () {
     SensorLevel front(double v) => SensorData(frontDistanceCm: v).frontLevel;
-    SensorLevel side(double v) => SensorData(leftDistanceCm: v).leftLevel;
+    SensorLevel side(double v) => SensorData(rightDistanceCm: v).rightLevel;
 
     test('정면 초음파: 50 이상 정상 / 20~50 경고 / 20 미만 위험', () {
       expect(front(200), SensorLevel.safe);
@@ -188,16 +190,11 @@ void main() {
       expect(front(0), SensorLevel.critical);
     });
 
-    test('측면(좌 ToF / 우 초음파): 15 이상 정상 / 8~15 경고 / 8 미만 위험', () {
+    test('우측 ToF: 15 이상 정상 / 8~15 경고 / 8 미만 위험', () {
       expect(side(15), SensorLevel.safe);
       expect(side(14.9), SensorLevel.caution);
       expect(side(8), SensorLevel.caution);
       expect(side(7.9), SensorLevel.critical);
-      SensorLevel right(double v) => SensorData(rightDistanceCm: v).rightLevel;
-      expect(right(15), SensorLevel.safe);
-      expect(right(14.9), SensorLevel.caution);
-      expect(right(8), SensorLevel.caution);
-      expect(right(7.9), SensorLevel.critical);
     });
 
     test('기울기: 5° 이상 경고(앱 표시용) / 10° 초과 위험(Arduino TILT 기준)', () {

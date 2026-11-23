@@ -14,25 +14,14 @@ class SensorThresholds {
   /// 이 값 **미만**이면 위험.
   static const double frontCriticalCm = 20;
 
-  // ── 측면 (cm) ── 15 이상 정상 / 8~15 경고 / 8 미만 위험
+  // ── 측면 ToF (R = 우측, cm) ── 15 이상 정상 / 8~15 경고 / 8 미만 위험
+  // 좌측(L)에는 센서가 없다 (항상 미사용).
 
   /// 이 값 **미만**이면 경고.
   static const double sideCautionCm = 15;
 
   /// 이 값 **미만**이면 위험.
   static const double sideCriticalCm = 8;
-
-  // ── 좌측 ToF (L, cm) ── 측면 기준
-
-  static const double leftCautionCm = sideCautionCm;
-  static const double leftCriticalCm = sideCriticalCm;
-
-  // ── 우측 초음파 (R, cm) ── 9주차에 ToF 고장으로 초음파로 교체.
-  // TODO(하드웨어 팀 확인 필요): 초음파용 기준이 정해지면 여기만 바꾼다.
-  //  현재는 ToF 때의 측면 기준(15/8)을 그대로 사용.
-
-  static const double rightCautionCm = sideCautionCm;
-  static const double rightCriticalCm = sideCriticalCm;
 
   // ── IMU 기울기 (T, deg) ──
   // Arduino는 T가 10°를 **넘으면**(> 10) S=STOP;H=TILT를 보낸다.

@@ -6,7 +6,7 @@ import '../models/sensor_data.dart';
 ///
 /// 전체 규칙은 `docs/PACKET.md` 참고. 요약:
 /// ```
-/// Z=2;S=WARN;H=SIDE,TILT;F=95.0;L=25.0;R=70.0;T=3.5;V=0.38
+/// Z=2;S=WARN;H=SIDE,TILT;F=95.0;L=-1;R=25.0;T=3.5;V=0.38
 /// ```
 /// - 필드는 `;` 구분, `키=값`, 순서 무관, 키/S/H는 대소문자 무시
 /// - **S가 없는 줄은 패킷이 아니므로 버린다** (null 반환)

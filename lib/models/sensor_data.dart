@@ -24,10 +24,10 @@ class SensorData {
   /// 정면 초음파 거리 (cm)
   final double? frontDistanceCm;
 
-  /// 좌측 ToF 거리 (cm)
+  /// 좌측 거리 (cm). 현재 좌측 센서 미장착 → 항상 null(미사용).
   final double? leftDistanceCm;
 
-  /// 우측 초음파 거리 (cm). 9주차에 ToF 고장으로 초음파로 교체.
+  /// 우측 ToF 거리 (cm)
   final double? rightDistanceCm;
 
   /// IMU 기울기 크기 (deg, 0 이상)
@@ -44,14 +44,14 @@ class SensorData {
 
   SensorLevel get leftLevel => _distanceLevel(
     leftDistanceCm,
-    SensorThresholds.leftCautionCm,
-    SensorThresholds.leftCriticalCm,
+    SensorThresholds.sideCautionCm,
+    SensorThresholds.sideCriticalCm,
   );
 
   SensorLevel get rightLevel => _distanceLevel(
     rightDistanceCm,
-    SensorThresholds.rightCautionCm,
-    SensorThresholds.rightCriticalCm,
+    SensorThresholds.sideCautionCm,
+    SensorThresholds.sideCriticalCm,
   );
 
   /// 위험(빨강)은 Arduino TILT 기준과 같게 10° **초과**. 정확히 10°는 경고.
