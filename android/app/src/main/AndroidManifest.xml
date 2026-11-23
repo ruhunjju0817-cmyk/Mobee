@@ -6,6 +6,12 @@
     <!-- Android 12 이상: 런타임 권한 ("근처 기기"). 페어링된 기기 조회/연결에 필요 -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
+    <!-- 위험 상태 경보 -->
+    <!-- 진동: 일반 권한 (설치 시 자동 허용) -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Android 13 이상: 시스템 알림 런타임 권한 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:label="MOBEE"
         android:name="${applicationName}"

@@ -39,6 +39,8 @@ dependencies:
   flutter_bluetooth_serial_plus: ^0.5.7
   # 13.x 이상은 AGP 9 / compileSdk 37이 필요해 현재 프로젝트에서 빌드되지 않으므로 12.x 고정
   permission_handler: ^12.0.3
+  flutter_local_notifications: ^22.3.3
+  vibration: ^3.2.1
 
 dev_dependencies:
   flutter_test:

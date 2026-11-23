@@ -2,9 +2,11 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
+import '../controllers/alarm_controller.dart';
 import '../controllers/monitor_controller.dart';
 import '../controllers/theme_controller.dart';
 import '../models/agv_enums.dart';
+import '../models/alarm.dart';
 import '../services/agv_data_source.dart';
 import '../theme/app_theme.dart';
 import '../theme/status_style.dart';
@@ -21,21 +23,28 @@ class MonitorScreen extends StatelessWidget {
     super.key,
     required this.controller,
     required this.theme,
+    this.alarm,
   });
 
   final MonitorController controller;
   final ThemeController theme;
+
+  /// 위험 상태 경보 (배너 + 앱바 알림/진동 버튼). null이면 경보 UI 없음.
+  final AlarmController? alarm;
 
   static const _wideBreakpoint = 720.0;
   static const _gap = 16.0;
 
   @override
   Widget build(BuildContext context) {
+    final alarm = this.alarm;
     return ListenableBuilder(
-      listenable: controller,
+      listenable: Listenable.merge([controller, ?alarm]),
       builder: (context, _) {
         final p = context.palette;
         final status = controller.status;
+        // 폰 세로 화면: 앱바 버튼 간격을 줄인다 (배지도 소스 이름을 축약).
+        final narrow = MediaQuery.sizeOf(context).width < 400;
 
         return DashboardBackground(
           child: Scaffold(
@@ -51,91 +60,117 @@ class MonitorScreen extends StatelessWidget {
                   connection: controller.connection,
                   onReconnect: controller.start,
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: narrow ? 6 : 10),
                 _ConnectionButton(controller: controller),
-                const SizedBox(width: 8),
+                if (alarm != null) ...[
+                  SizedBox(width: narrow ? 6 : 8),
+                  _AlarmButton(alarm: alarm),
+                ],
+                SizedBox(width: narrow ? 6 : 8),
                 _ThemeToggle(theme: theme),
-                const SizedBox(width: 20),
+                SizedBox(width: narrow ? 12 : 20),
               ],
             ),
-            body: SafeArea(
-              bottom: false,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final zone = ZoneCard(zone: status.zone);
-                  final drive = DriveStateCard(state: status.driveState);
-                  final hazard = HazardCard(status: status);
-                  final sensor = SensorCard(
-                    sensors: status.sensors,
-                    hasData: status.hasData,
-                  );
-                  const gap = SizedBox(width: _gap, height: _gap);
+            body: Stack(
+              children: [
+                SafeArea(
+                  bottom: false,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final zone = ZoneCard(zone: status.zone);
+                      final drive = DriveStateCard(state: status.driveState);
+                      final hazard = HazardCard(status: status);
+                      final sensor = SensorCard(
+                        sensors: status.sensors,
+                        hasData: status.hasData,
+                      );
+                      const gap = SizedBox(width: _gap, height: _gap);
 
-                  final content = constraints.maxWidth >= _wideBreakpoint
-                      ? Column(
-                          children: [
-                            _pair(zone, drive),
-                            gap,
-                            _pair(hazard, sensor),
-                          ],
-                        )
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            zone,
-                            gap,
-                            drive,
-                            gap,
-                            hazard,
-                            gap,
-                            sensor,
-                          ],
-                        );
+                      final content = constraints.maxWidth >= _wideBreakpoint
+                          ? Column(
+                              children: [
+                                _pair(zone, drive),
+                                gap,
+                                _pair(hazard, sensor),
+                              ],
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                zone,
+                                gap,
+                                drive,
+                                gap,
+                                hazard,
+                                gap,
+                                sensor,
+                              ],
+                            );
 
-                  // extendBody 상태에서 하단 inset = 하단 바 높이.
-                  final bottomInset = MediaQuery.paddingOf(context).bottom;
+                      // extendBody 상태에서 하단 inset = 하단 바 높이.
+                      final bottomInset = MediaQuery.paddingOf(context).bottom;
 
-                  return SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(20, 8, 20, bottomInset + 24),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1100),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            if (controller.errorMessage != null)
-                              _ErrorBanner(message: controller.errorMessage!),
-                            if (controller.isStale)
-                              _StaleBanner(
-                                lastUpdate: status.hasData
-                                    ? status.timestamp
-                                    : null,
-                              ),
-                            // 패킷이 끊기면 마지막 값을 흐리게 보여 현재 값이 아님을 표시.
-                            AnimatedOpacity(
-                              key: const ValueKey('dashboard-content'),
-                              opacity: controller.isStale ? 0.35 : 1,
-                              duration: const Duration(milliseconds: 250),
-                              child: content,
-                            ),
-                            const SizedBox(height: 20),
-                            Text(
-                              'LAST UPDATE   ${status.hasData ? _formatTime(status.timestamp) : '--:--:--'}',
-                              textAlign: TextAlign.center,
-                              style: AppText.label(p).copyWith(
-                                color: p.textMuted,
-                                fontFeatures: const [
-                                  FontFeature.tabularFigures(),
-                                ],
-                              ),
-                            ),
-                          ],
+                      return SingleChildScrollView(
+                        padding: EdgeInsets.fromLTRB(
+                          20,
+                          8,
+                          20,
+                          bottomInset + 24,
                         ),
-                      ),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 1100),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (controller.errorMessage != null)
+                                  _ErrorBanner(
+                                    message: controller.errorMessage!,
+                                  ),
+                                if (controller.isStale)
+                                  _StaleBanner(
+                                    lastUpdate: status.hasData
+                                        ? status.timestamp
+                                        : null,
+                                  ),
+                                // 패킷이 끊기면 마지막 값을 흐리게 보여 현재 값이 아님을 표시.
+                                AnimatedOpacity(
+                                  key: const ValueKey('dashboard-content'),
+                                  opacity: controller.isStale ? 0.35 : 1,
+                                  duration: const Duration(milliseconds: 250),
+                                  child: content,
+                                ),
+                                const SizedBox(height: 20),
+                                Text(
+                                  'LAST UPDATE   ${status.hasData ? _formatTime(status.timestamp) : '--:--:--'}',
+                                  textAlign: TextAlign.center,
+                                  style: AppText.label(p).copyWith(
+                                    color: p.textMuted,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                // 위험 상태 경보 배너 (몇 초 뒤 자동으로 사라짐).
+                if (alarm != null)
+                  Positioned(
+                    top: 8,
+                    left: 16,
+                    right: 16,
+                    child: _AlarmBanner(
+                      event: alarm.banner,
+                      onDismiss: alarm.dismissBanner,
                     ),
-                  );
-                },
-              ),
+                  ),
+              ],
             ),
             bottomNavigationBar: controller.canSimulate
                 ? _ScenarioBar(
@@ -172,13 +207,31 @@ class MonitorScreen extends StatelessWidget {
 class _Title extends StatelessWidget {
   const _Title();
 
+  static const _logoSize = 40.0;
+  static const _logoGap = 12.0;
+
+  /// 글자를 보여줄 최소 폭. 이보다 좁으면 로고만, 로고도 안 들어가면 비운다.
+  static const _minTextWidth = 48.0;
+
   @override
   Widget build(BuildContext context) {
+    // 앱바 오른쪽 버튼이 많아 제목 자리가 좁아질 수 있으므로 폭에 맞춰 줄인다.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        if (w < _logoSize) return const SizedBox.shrink();
+        final showText = w >= _logoSize + _logoGap + _minTextWidth;
+        return _buildRow(context, showText: showText);
+      },
+    );
+  }
+
+  Widget _buildRow(BuildContext context, {required bool showText}) {
     final p = context.palette;
     return Row(
       children: [
         Container(
-          width: 40,
+          width: _logoSize,
           height: 40,
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -197,32 +250,36 @@ class _Title extends StatelessWidget {
           ),
           child: Icon(Icons.shield_moon_rounded, color: p.accent, size: 22),
         ),
-        const SizedBox(width: 12),
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'ZoneGuard Monitor',
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.3,
+        if (showText) ...[
+          const SizedBox(width: _logoGap),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'ZoneGuard Monitor',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.3,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'MOBEE AGV · 실시간 모니터링',
-                overflow: TextOverflow.ellipsis,
-                style: AppText.label(
-                  p,
-                ).copyWith(fontSize: 10, letterSpacing: 1, color: p.textMuted),
-              ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  'MOBEE AGV · 실시간 모니터링',
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.label(p).copyWith(
+                    fontSize: 10,
+                    letterSpacing: 1,
+                    color: p.textMuted,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -244,6 +301,9 @@ class _ConnectionBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    // 좁은 화면(폰 세로)에서는 앱바 버튼이 많아 소스 이름을 줄여 쓴다.
+    final narrow = MediaQuery.sizeOf(context).width < 400;
+    final shownName = narrow && sourceName == 'BLUETOOTH' ? 'BT' : sourceName;
     final label = connection.label;
     final color = switch (connection) {
       ConnectionStatus.connected => AppColors.safe,
@@ -276,7 +336,7 @@ class _ConnectionBadge extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            sourceName,
+            shownName,
             style: AppText.label(p).copyWith(
               color: p.textPrimary,
               fontWeight: FontWeight.w700,
@@ -350,6 +410,164 @@ class _ConnectionButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 알림/진동 켜기·끄기 메뉴 버튼. 아이콘으로 현재 설정을 보여준다.
+class _AlarmButton extends StatelessWidget {
+  const _AlarmButton({required this.alarm});
+
+  final AlarmController alarm;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final notify = alarm.notifyEnabled;
+    final vibrate = alarm.vibrateEnabled && alarm.hasVibrator;
+    final icon = notify
+        ? Icons.notifications_active_rounded
+        : vibrate
+        ? Icons.vibration_rounded
+        : Icons.notifications_off_rounded;
+    return Material(
+      color: p.surface,
+      shape: CircleBorder(side: BorderSide(color: p.border)),
+      clipBehavior: Clip.antiAlias,
+      child: PopupMenuButton<_AlarmToggle>(
+        key: const ValueKey('alarm-button'),
+        tooltip: '알림/진동 설정',
+        position: PopupMenuPosition.under,
+        onSelected: (t) => switch (t) {
+          _AlarmToggle.notify => alarm.setNotifyEnabled(!alarm.notifyEnabled),
+          _AlarmToggle.vibrate => alarm.setVibrateEnabled(
+            !alarm.vibrateEnabled,
+          ),
+        },
+        itemBuilder: (_) => [
+          CheckedPopupMenuItem(
+            key: const ValueKey('alarm-toggle-notify'),
+            value: _AlarmToggle.notify,
+            checked: alarm.notifyEnabled,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('위험 알림'),
+              subtitle: Text(
+                alarm.notifyEnabled && alarm.notificationPermission == false
+                    ? '화면 배너만 표시 (시스템 알림 권한 없음)'
+                    : '화면 배너 + 백그라운드 알림',
+              ),
+            ),
+          ),
+          CheckedPopupMenuItem(
+            key: const ValueKey('alarm-toggle-vibrate'),
+            value: _AlarmToggle.vibrate,
+            checked: alarm.vibrateEnabled,
+            enabled: alarm.hasVibrator,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('진동'),
+              subtitle: Text(
+                alarm.hasVibrator ? '위험 단계별 진동' : '이 기기는 진동을 지원하지 않습니다',
+              ),
+            ),
+          ),
+        ],
+        child: SizedBox(
+          width: 38,
+          height: 38,
+          child: Icon(
+            icon,
+            size: 20,
+            color: notify || vibrate ? p.accent : p.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+enum _AlarmToggle { notify, vibrate }
+
+/// 화면 상단 경보 배너. [event]가 null이면 숨김. 탭하면 닫힌다.
+class _AlarmBanner extends StatelessWidget {
+  const _AlarmBanner({required this.event, required this.onDismiss});
+
+  final AlarmEvent? event;
+  final VoidCallback onDismiss;
+
+  static Color colorOf(AlarmStage stage) => switch (stage) {
+    AlarmStage.collision ||
+    AlarmStage.tilt ||
+    AlarmStage.blocked => AppColors.danger,
+    AlarmStage.danger || AlarmStage.lineLost => AppColors.alert,
+    AlarmStage.warning => AppColors.warning,
+    AlarmStage.none => AppColors.inactive,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final e = event;
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      transitionBuilder: (child, animation) => SlideTransition(
+        position: Tween(
+          begin: const Offset(0, -0.4),
+          end: Offset.zero,
+        ).animate(animation),
+        child: FadeTransition(opacity: animation, child: child),
+      ),
+      child: e == null
+          ? const SizedBox.shrink()
+          : Center(
+              key: ValueKey(e),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: Material(
+                  key: const ValueKey('alarm-banner'),
+                  color: colorOf(e.stage),
+                  elevation: 8,
+                  borderRadius: BorderRadius.circular(16),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: onDismiss,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.warning_rounded,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              e.text,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                          const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white70,
+                            size: 18,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
     );
   }
 }
